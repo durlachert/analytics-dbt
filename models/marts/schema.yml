@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: fct_orders
+    tests: []
+    columns:
+      - name: CUSTOMER_ID
+        tests:
+          - not_null
+          - unique        # one row per customer in this fact
+          - relationships:
+              to: source('raw', 'customers')
+              field: CUSTOMER_ID
+      - name: ORDER_COUNT
+        tests:
+          - not_null
+      - name: TOTAL_SPEND
+        tests:
+          - not_null
+          - non_negative
