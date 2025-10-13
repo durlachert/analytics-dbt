@@ -2,14 +2,14 @@ name: analytics
 version: 1.0.0
 config-version: 2
 profile: analytics
+
 model-paths: ["models"]
 macro-paths: ["macros"]
 
-
 models:
-analytics:
-+materialized: view
-staging:
-+schema: STAGING
-marts:
-+schema: MARTS
+  analytics:
+    +materialized: view
+    staging:
+      +schema: STAGING
+    marts:
+      +schema: MARTS
