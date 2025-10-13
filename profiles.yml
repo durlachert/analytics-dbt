@@ -1,22 +1,25 @@
 analytics:
   target: dev
   outputs:
-    dev:
+    dev: &base
       type: snowflake
-      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      # Prefer SNOWFLAKE_ACCOUNT_IDENTIFIER if provided; otherwise build <ORG>-<ACCOUNT>
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT_IDENTIFIER', env_var('SNOWFLAKE_ORGANIZATION_NAME') ~ '-' ~ env_var('SNOWFLAKE_ACCOUNT_NAME')) }}"
       user: "{{ env_var('SNOWFLAKE_USER') }}"
       password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
       role: "{{ env_var('SNOWFLAKE_ROLE', 'DEV_ROLE') }}"
-      database: DEV_DB
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'DEV_WH') }}"
-      schema: STAGING
+      database: "DEV_DB"
+      schema: "STAGING"
+
     stg:
-      <<: *dev
-      database: STG_DB
+      <<: *base
       role: "{{ env_var('SNOWFLAKE_ROLE', 'STG_ROLE') }}"
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'STG_WH') }}"
+      database: "STG_DB"
+
     prod:
-      <<: *dev
-      database: PROD_DB
+      <<: *base
       role: "{{ env_var('SNOWFLAKE_ROLE', 'PROD_ROLE') }}"
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'PROD_WH') }}"
+      database: "PROD_DB"
