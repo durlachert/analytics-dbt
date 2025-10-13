@@ -1,7 +1,9 @@
 version: 2
 sources:
-- name: raw
-database: {{ target.name | upper }}_DB
-schema: RAW
-tables:
-- name: orders
+  - name: raw
+    # Choose DB by active target (dev/stg/prod)
+    database: "{{ target.name | upper }}_DB"
+    schema: RAW
+    tables:
+      - name: orders
+      - name: customers
