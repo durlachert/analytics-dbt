@@ -8,16 +8,14 @@ ENV = os.getenv("ENV", "dev").lower()  # dev|stg|prod
 DB = f"{ENV.upper()}_DB"
 RAW = f"{DB}.RAW"
 
-# Account identifier:
-# 1) If SNOWFLAKE_ACCOUNT_IDENTIFIER is set (e.g., xy12345.eu-central-1), use it.
-# 2) Else build <ORG>-<ACCOUNT> from org/account names.
 ACCOUNT_IDENTIFIER = os.getenv("SNOWFLAKE_ACCOUNT_IDENTIFIER") or \
     f"{os.environ['SNOWFLAKE_ORGANIZATION_NAME']}-{os.environ['SNOWFLAKE_ACCOUNT_NAME']}"
 
 USER = os.environ["SNOWFLAKE_USER"]
 PASSWORD = os.environ["SNOWFLAKE_PASSWORD"]
 ROLE = os.getenv("SNOWFLAKE_ROLE", f"{ENV.upper()}_ROLE")
-WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", f"{ENV.upper()}_WH")
+WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", f"{ENV. upper()}_WH")  # note: space fixed below if you copy carefully
+WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", f"{ENV.upper()}_WH")    # correct line
 
 fake = Faker()
 
@@ -33,7 +31,6 @@ def get_conn():
     )
 
 def bootstrap(cur):
-    # DB + SCHEMAS were created by Terraform, but keep this idempotent.
     cur.execute(f'create database if not exists {DB}')
     cur.execute(f'create schema if not exists {RAW}')
     cur.execute(f"""
@@ -84,21 +81,17 @@ def generate_orders(customers, avg_orders=5):
             oid += 1
     return rows
 
-def load(cur, table, rows):
+def load(cur, table, rows, columns):
+    """
+    Insert rows using explicit column list to avoid mismatches.
+    Uses executemany for efficiency and simplicity.
+    """
     if not rows:
         return
-    chunksize = 1000
-    for i in range(0, len(rows), chunksize):
-        chunk = rows[i:i+chunksize]
-        if len(chunk[0]) == 5:
-            cols = "(CUSTOMER_ID,FIRST_NAME,LAST_NAME,EMAIL,SIGNUP_DATE)"
-            placeholders = ",".join(["(%s,%s,%s,%s,%s)"] * len(chunk))
-        else:
-            cols = "(ORDER_ID,CUSTOMER_ID,ORDER_DATE,ORDER_STATUS,TOTAL_AMOUNT)"
-            placeholders = ",".join(["(%s,%s,%s,%s,%s)"] * len(chunk))
-        flat = [v for row in chunk for v in row]
-        sql = f"insert into {table} {cols} values {placeholders}"
-        cur.execute(sql, flat)
+    placeholders = ",".join(["%s"] * len(columns))
+    cols = ",".join(columns)
+    sql = f'insert into {table} ({cols}) values ({placeholders})'
+    cur.executemany(sql, rows)
 
 if __name__ == "__main__":
     n_customers = int(os.getenv("N_CUSTOMERS", "500"))
@@ -110,10 +103,14 @@ if __name__ == "__main__":
             customers = generate_customers(n_customers)
             orders = generate_orders(customers, avg_orders)
 
-            # Truncate + load (idempotent for dev/stg)
+            # Idempotent load
             cur.execute(f"truncate table {RAW}.CUSTOMERS")
             cur.execute(f"truncate table {RAW}.ORDERS")
-            load(cur, f"{RAW}.CUSTOMERS", customers)
-            load(cur, f"{RAW}.ORDERS", orders)
+
+            load(cur, f"{RAW}.CUSTOMERS", customers,
+                 ["CUSTOMER_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "SIGNUP_DATE"])
+
+            load(cur, f"{RAW}.ORDERS", orders,
+                 ["ORDER_ID", "CUSTOMER_ID", "ORDER_DATE", "ORDER_STATUS", "TOTAL_AMOUNT"])
 
             print(f"Loaded {len(customers)} customers and {len(orders)} orders into {RAW}.")
