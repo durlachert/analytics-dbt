@@ -1,9 +1,35 @@
 version: 2
+
 sources:
   - name: raw
-    # Choose DB by active target (dev/stg/prod)
     database: "{{ target.name | upper }}_DB"
     schema: RAW
     tables:
-      - name: orders
       - name: customers
+        columns:
+          - name: CUSTOMER_ID
+            tests:
+              - not_null
+              - unique
+          - name: EMAIL
+            tests:
+              - not_null
+      - name: orders
+        columns:
+          - name: ORDER_ID
+            tests:
+              - not_null
+              - unique
+          - name: CUSTOMER_ID
+            tests:
+              - not_null
+              - relationships:
+                  to: source('raw', 'customers')
+                  field: CUSTOMER_ID
+          - name: ORDER_STATUS
+            tests:
+              - accepted_values:
+                  values: ['PLACED', 'SHIPPED', 'DELIVERED', 'CANCELLED']
+          - name: TOTAL_AMOUNT
+            tests:
+              - non_negative  # custom test added below
