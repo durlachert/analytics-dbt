@@ -1,0 +1,48 @@
+name: dbt
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment
+        required: true
+        default: dev
+        type: choice
+        options: [dev, stg, prod]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Load fake data (idempotent)
+        env:
+          ENV: ${{ inputs.env || 'dev' }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        run: python scripts/generate_fake_data.py
+      - name: dbt build
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        run: |
+          pip install dbt-core dbt-snowflake
+          # choose database by env; dbt reads from profiles.yml if present, but here we override via flags
+          if [ "${{ inputs.env }}" = "stg" ]; then DB=STG_DB; elif [ "${{ inputs.env }}" = "prod" ]; then DB=PROD_DB; else DB=DEV_DB; fi
+          dbt debug --profiles-dir . || true
+          dbt build --profiles-dir . --target ${{ inputs.env || 'dev' }}
